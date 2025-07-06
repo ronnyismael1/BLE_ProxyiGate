@@ -1,0 +1,2 @@
+source /home/ronny/Repos/project_mcu_dog/implementation/src/build/gdbinit/symbols
+source /home/ronny/Repos/project_mcu_dog/implementation/src/build/gdbinit/connect
