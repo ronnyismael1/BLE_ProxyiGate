@@ -1,4 +1,4 @@
-# Project Idea - RFID Blocked Litter Box
+# Project Idea - BLE ProxiPetGate
 
 ## References
 Example projects for the ESP32:
@@ -24,7 +24,7 @@ URL:[Neovim as ESP32 IDE with Cland LSP](https://ncona.com/2024/0/neovim-as-esp3
 ```
 ```
 
-1. Architecture   - Simulations and schematics 
+1. Architecture   - Simulations and schematics
 2. Design         - BOM and other misc
 3. Implementation - Code source
 4. Validation     - Test cases
@@ -32,18 +32,18 @@ URL:[Neovim as ESP32 IDE with Cland LSP](https://ncona.com/2024/0/neovim-as-esp3
 
 
 ## Rough Idea
-* Simon will wear a RFID tag on his collar
-* RFID reader scans entrance to litter box
+* Simon will wear a BLE tag on his collar
+* BLE reader scans entrance to litter box
 * If Simon's tag is detected then the flap closes
 
 
 ## Limitations
-1. RFID modules usually have short range
+1. BLE modules usually have short range
 2. Dog might move fast back and forth, add lockout period?
 
 
 ## Seudo BOM
-1. RC522 RFID module (ID-12LA-HE? 17cm distance)
+1. nRF52 Bluetooth Beacon
 2. Microcontroller (arduino, esp32, ...)
 3. Some sort of servo
 4. misc wires and stuff
