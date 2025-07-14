@@ -4,6 +4,14 @@ Turn on venv: `get_idf`
 
 ## HOW TO BUILD AND FLASH ESP32 DEVICE
 
+### compile_commands.json for LSP
+
+`idf.py fullclean`
+`idf.py build`
+
+Create symlink: `ln -sf ~/Repos/project_ble_proxigate/implementation/src/build/compile_commands.json ~/Repos/project_ble_proxigate/`
+Check: `grep -A10 '"file": .*main.c' ~/Repos/project_ble_proxigate/compile_commands.json`
+
 ### Building the Project
 
 Okay since we entered venv and ran cmake, we can now build the project.
@@ -61,4 +69,8 @@ sudo locale-gen
 # verify with below
 locale
 ```
+
+## EXAMPLE PROJECT
+`~/esp/esp-idf/examples/bluetooth/nimble/ble_proximity_sensor/proximity_sensor_cent/`
+This example shows proximity calculating with RSSI
 
