@@ -19,6 +19,8 @@ Okay since we entered venv and ran cmake, we can now build the project.
 ```
 cd ~/Repos/project_mcu_dog/implementation/src
 idf.py build
+# add yourself to dial group if not done yet
+sudo usermod -a -G uucp ronny
 idf.py -p /dev/ttyUSB0 flash
 ```
 
@@ -72,5 +74,6 @@ locale
 
 ## EXAMPLE PROJECT
 `~/esp/esp-idf/examples/bluetooth/nimble/ble_proximity_sensor/proximity_sensor_cent/`
+`~/esp/esp-idf/examples/bluetooth/nimble/blecent/main/main.c`
 This example shows proximity calculating with RSSI
 
