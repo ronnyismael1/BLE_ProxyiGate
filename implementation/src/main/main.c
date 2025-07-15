@@ -13,6 +13,7 @@
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
+#include "host/ble_hs_adv.h"
 #include "host/util/util.h"
 #include "console/console.h"
 #include "services/gap/ble_svc_gap.h"
@@ -38,14 +39,31 @@ static int ble_gap_event_cb(struct ble_gap_event *event, void *arg)
     {
         char addr_str[18] = {0};
         ble_addr_to_str_fixed(&event->disc.addr, addr_str, sizeof(addr_str));
+        /* ESP_LOGI(TAG, "Found device: %s, RSSI: %d", addr_str, event->disc.rssi); */
 
-        ESP_LOGI(TAG, "Found device: %s, RSSI: %d", addr_str, event->disc.rssi);
+        /* if mac address matches do xyz */
+        /*
+         * Probably depreciated if using rotating mac addressing
+         */
+        (void)MY_TAG_ADDR;
+        // if (memcmp(event->disc.addr.val, MY_TAG_ADDR, 6) == 0 &&
+        //     event->disc.rssi > RSSI_THRESHOLD)
+        // {
+        //     ESP_LOGI(TAG, ">>> Target device within ~1m detected!");
+        //     /* call handler */
+        // }
 
-        if (memcmp(event->disc.addr.val, MY_TAG_ADDR, 6) == 0 &&
-            event->disc.rssi > RSSI_THRESHOLD)
-        {
-            ESP_LOGI(TAG, ">>> Target device within ~1m detected!");
-            /* call handler */
+        struct ble_hs_adv_fields fields;
+        if (ble_hs_adv_parse_fields(&fields, event->disc.data, event->disc.length_data) == 0) {
+            if (fields.name != NULL)
+            {
+                /* ESP_LOGI(TAG, "Device name: %.*s", fields.name_len, fields.name); */
+
+                if (strncmp((const char*)fields.name, "Ronny", fields.name_len) == 0)
+                {
+                    ESP_LOGI(TAG, ">>> UUID: %s, RSSI: %d", fields.name, event->disc.rssi);
+                }
+            }
         }
     }
     return 0;
