@@ -14,6 +14,8 @@
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
 #include "host/ble_hs_adv.h"
+#include "driver/ledc.h"
+#include "esp_err.h"
 #include "host/util/util.h"
 #include "console/console.h"
 #include "services/gap/ble_svc_gap.h"
@@ -23,6 +25,17 @@
 static const char *TAG = "BLE_ProxiGate";
 static const uint8_t MY_TAG_ADDR[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};  /* MAC Address of BLE beacon */
 
+static void handle_proximity_detected(void)
+{
+    /* close motors */
+    /* send ping over wifi? */
+    /* blare alarm? */
+}
+
+static void handle_proximity_lost(void)
+{
+    /* if door is open then close? */
+}
 
 static void ble_addr_to_str_fixed(const ble_addr_t *addr, char *str, size_t size)
 {
@@ -35,7 +48,7 @@ static void ble_addr_to_str_fixed(const ble_addr_t *addr, char *str, size_t size
 /* Called when a device is discovered during scanning */
 static int ble_gap_event_cb(struct ble_gap_event *event, void *arg)
 {
-    if (event->type == BLE_GAP_EVENT_DISC)
+    if (BLE_GAP_EVENT_DISC == event->type)
     {
         char addr_str[18] = {0};
         ble_addr_to_str_fixed(&event->disc.addr, addr_str, sizeof(addr_str));
@@ -55,13 +68,20 @@ static int ble_gap_event_cb(struct ble_gap_event *event, void *arg)
 
         struct ble_hs_adv_fields fields;
         if (ble_hs_adv_parse_fields(&fields, event->disc.data, event->disc.length_data) == 0) {
-            if (fields.name != NULL)
+            if (NULL != fields.name)
             {
                 /* ESP_LOGI(TAG, "Device name: %.*s", fields.name_len, fields.name); */
 
                 if (strncmp((const char*)fields.name, "Ronny", fields.name_len) == 0)
                 {
-                    ESP_LOGI(TAG, ">>> UUID: %s, RSSI: %d", fields.name, event->disc.rssi);
+                    ESP_LOGI(TAG, ">>> Name: %.*s, RSSI: %d", fields.name_len, fields.name, event->disc.rssi);
+                    if (RSSI_THRESHOLD < event->disc.rssi)
+                    {
+                        handle_proximity_detected();
+                    } else
+                    {
+                        handle_proximity_lost();
+                    }
                 }
             }
         }
@@ -81,7 +101,7 @@ static void ble_app_scan(void)
     params.limited = 0;
 
     int rc = ble_gap_disc(0, BLE_HS_FOREVER, &params, ble_gap_event_cb, NULL);
-    if (rc != 0)
+    if (0 != rc)
     {
         ESP_LOGE(TAG, "Error initiating GAP discovery: %d", rc);
     } else
@@ -106,7 +126,7 @@ app_main(void)
 
     /* Initialize NVS — it is used to store PHY calibration data */
     esp_err_t ret = nvs_flash_init();
-    if  (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    if  (ESP_ERR_NVS_NO_FREE_PAGES == ret || ESP_ERR_NVS_NEW_VERSION_FOUND == ret)
     {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
@@ -115,7 +135,7 @@ app_main(void)
 
     /* Initialize the BLE stack */
     ret = nimble_port_init();
-    if (ret != ESP_OK)
+    if (ESP_OK != ret)
     {
         ESP_LOGE(TAG, "Failed to init nimble %d ", ret);
         return;
