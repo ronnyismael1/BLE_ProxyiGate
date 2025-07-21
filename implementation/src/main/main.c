@@ -9,7 +9,6 @@
 
 #include "esp_log.h"
 #include "nvs_flash.h"
-/* BLE */
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
@@ -19,22 +18,53 @@
 #include "host/util/util.h"
 #include "console/console.h"
 #include "services/gap/ble_svc_gap.h"
+#include "servo_motor.h"
+#include "soc/gpio_num.h"
 
-#define RSSI_THRESHOLD (-55) /* Placeholder for now, gotta experiment to figure it out */
+/*****************************
+ *  DEFINES
+ *****************************/
+
+/* #define RSSI_THRESHOLD (-30) */
+
+#define RSSI_THRESHOLD_CLOSE (-30)  /* below this, close */
+#define RSSI_THRESHOLD_OPEN  (-45)  /* above this, open */
+
+#define PASS (0)
+#define FAIL (-1)
+
+/*****************************
+ *  GLOBALS
+ *****************************/
 
 static const char *TAG = "BLE_ProxiGate";
-static const uint8_t MY_TAG_ADDR[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};  /* MAC Address of BLE beacon */
+static const uint8_t MY_TAG_ADDR[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};  /* MAC Address of TARGET BLE beacon */
+static bool door_closed = false;
 
-static void handle_proximity_detected(void)
+/*****************************
+ *  FUNCTION PROTOTYPES
+ *****************************/
+
+/*****************************
+ *  LOCAL FUNCTIONS
+ *****************************/
+
+static int handle_proximity_detected(void)
 {
     /* close motors */
+    ESP_LOGI(TAG, ">>> Proximity threshold reached, closing door...");
+    set_servo_angle(90);
     /* send ping over wifi? */
     /* blare alarm? */
+    return PASS;
 }
 
-static void handle_proximity_lost(void)
+static int handle_proximity_lost(void)
 {
     /* if door is open then close? */
+    ESP_LOGI(TAG, ">>> Proximity threshold lost, opening door...");
+    set_servo_angle(0);
+    return PASS;
 }
 
 static void ble_addr_to_str_fixed(const ble_addr_t *addr, char *str, size_t size)
@@ -48,6 +78,9 @@ static void ble_addr_to_str_fixed(const ble_addr_t *addr, char *str, size_t size
 /* Called when a device is discovered during scanning */
 static int ble_gap_event_cb(struct ble_gap_event *event, void *arg)
 {
+    int rc;
+    (void) MY_TAG_ADDR;
+
     if (BLE_GAP_EVENT_DISC == event->type)
     {
         char addr_str[18] = {0};
@@ -58,7 +91,6 @@ static int ble_gap_event_cb(struct ble_gap_event *event, void *arg)
         /*
          * Probably depreciated if using rotating mac addressing
          */
-        (void)MY_TAG_ADDR;
         // if (memcmp(event->disc.addr.val, MY_TAG_ADDR, 6) == 0 &&
         //     event->disc.rssi > RSSI_THRESHOLD)
         // {
@@ -67,31 +99,47 @@ static int ble_gap_event_cb(struct ble_gap_event *event, void *arg)
         // }
 
         struct ble_hs_adv_fields fields;
-        if (ble_hs_adv_parse_fields(&fields, event->disc.data, event->disc.length_data) == 0) {
+        if (0 == ble_hs_adv_parse_fields(&fields, event->disc.data, event->disc.length_data)) {
             if (NULL != fields.name)
             {
                 /* ESP_LOGI(TAG, "Device name: %.*s", fields.name_len, fields.name); */
-
-                if (strncmp((const char*)fields.name, "Ronny", fields.name_len) == 0)
+                if (0 == strncmp((const char*)fields.name, "Ronny", fields.name_len))
                 {
                     ESP_LOGI(TAG, ">>> Name: %.*s, RSSI: %d", fields.name_len, fields.name, event->disc.rssi);
-                    if (RSSI_THRESHOLD < event->disc.rssi)
+                    if (RSSI_THRESHOLD_CLOSE < event->disc.rssi)
                     {
-                        handle_proximity_detected();
-                    } else
+                        if (!door_closed)
+                        {
+                            rc = handle_proximity_detected();
+                            if (PASS != rc)
+                            {
+                                ESP_LOGE(TAG, "Error: handling handle_proximity_detected()");
+                            }
+                            door_closed = true;
+                        }
+                    } else if (RSSI_THRESHOLD_OPEN > event->disc.rssi)
                     {
-                        handle_proximity_lost();
+                        if (door_closed)
+                        {
+                            rc = handle_proximity_lost();
+                            if (PASS != rc)
+                            {
+                                ESP_LOGE(TAG, "Error: handling handle_proximity_lost()");
+                            }
+                            door_closed = false;
+                        }
                     }
                 }
             }
         }
     }
-    return 0;
+    return PASS;
 }
 
 /* Start scanning */
 static void ble_app_scan(void)
 {
+    int rc;
     struct ble_gap_disc_params params = {0};
 
     params.passive = 0;       /* active scanning */
@@ -100,8 +148,8 @@ static void ble_app_scan(void)
     params.filter_policy = 0;
     params.limited = 0;
 
-    int rc = ble_gap_disc(0, BLE_HS_FOREVER, &params, ble_gap_event_cb, NULL);
-    if (0 != rc)
+    rc = ble_gap_disc(0, BLE_HS_FOREVER, &params, ble_gap_event_cb, NULL);
+    if (PASS != rc)
     {
         ESP_LOGE(TAG, "Error initiating GAP discovery: %d", rc);
     } else
@@ -109,6 +157,10 @@ static void ble_app_scan(void)
         ESP_LOGI(TAG, "Scanning started...");
     }
 }
+
+/*****************************
+ *  GLOBAL FUNCTIONS
+ *****************************/
 
 /* BLE host task */
 void host_task(void *param)
@@ -140,6 +192,8 @@ app_main(void)
         ESP_LOGE(TAG, "Failed to init nimble %d ", ret);
         return;
     }
+
+    setup_pwm(GPIO_NUM_33);
 
     ble_hs_cfg.reset_cb = NULL;
     ble_hs_cfg.sync_cb = ble_app_scan;  /* called when BLE stack is ready */
