@@ -81,59 +81,54 @@ ble_gap_event_cb(struct ble_gap_event *event, void *arg)
 {
     int rc;
     (void) MY_TAG_ADDR;
+    char addr_str[18] = {0};
+    struct ble_hs_adv_fields fields;
 
-    if (BLE_GAP_EVENT_DISC == event->type)
+    if (BLE_GAP_EVENT_DISC != event->type)
     {
-        char addr_str[18] = {0};
-        ble_addr_to_str_fixed(&event->disc.addr, addr_str, sizeof(addr_str));
-        /* ESP_LOGI(TAG, "Found device: %s, RSSI: %d", addr_str, event->disc.rssi); */
-
-        /* if mac address matches do xyz */
-        /*
-         * Probably depreciated if using rotating mac addressing
-         */
-        // if (memcmp(event->disc.addr.val, MY_TAG_ADDR, 6) == 0 &&
-        //     event->disc.rssi > RSSI_THRESHOLD)
-        // {
-        //     ESP_LOGI(TAG, ">>> Target device within ~1m detected!");
-        //     /* call handler */
-        // }
-
-        struct ble_hs_adv_fields fields;
-        if (0 == ble_hs_adv_parse_fields(&fields, event->disc.data, event->disc.length_data)) {
-            if (NULL != fields.name)
-            {
-                /* ESP_LOGI(TAG, "Device name: %.*s", fields.name_len, fields.name); */
-                if (0 == strncmp((const char*)fields.name, "Ronny", fields.name_len))
-                {
-                    ESP_LOGI(TAG, ">>> Name: %.*s, RSSI: %d", fields.name_len, fields.name, event->disc.rssi);
-                    if (RSSI_THRESHOLD_CLOSE < event->disc.rssi)
-                    {
-                        if (!door_closed)
-                        {
-                            rc = handle_proximity_detected();
-                            if (PASS != rc)
-                            {
-                                ESP_LOGE(TAG, "Error: handling handle_proximity_detected()");
-                            }
-                            door_closed = true;
-                        }
-                    } else if (RSSI_THRESHOLD_OPEN > event->disc.rssi)
-                    {
-                        if (door_closed)
-                        {
-                            rc = handle_proximity_lost();
-                            if (PASS != rc)
-                            {
-                                ESP_LOGE(TAG, "Error: handling handle_proximity_lost()");
-                            }
-                            door_closed = false;
-                        }
-                    }
-                }
-            }
-        }
+        goto EXIT;
     }
+
+    ble_addr_to_str_fixed(&event->disc.addr, addr_str, sizeof(addr_str));
+
+    if (0 != ble_hs_adv_parse_fields(&fields, event->disc.data, event->disc.length_data))
+    {
+        goto EXIT;
+    }
+
+    if (NULL == fields.name)
+    {
+       goto EXIT;
+    }
+
+    /* ESP_LOGI(TAG, "Device name: %.*s", fields.name_len, fields.name); */
+    if (0 != strncmp((const char*)fields.name, "Ronny", fields.name_len))
+    {
+       goto EXIT;
+    }
+
+    ESP_LOGI(TAG, ">>> Name: %.*s, RSSI: %d", fields.name_len, fields.name, event->disc.rssi);
+
+    if ((RSSI_THRESHOLD_CLOSE < event->disc.rssi) && !door_closed)
+    {
+        rc = handle_proximity_detected();
+        if (PASS != rc)
+        {
+            ESP_LOGE(TAG, "Error: handling handle_proximity_detected()");
+        }
+        door_closed = true;
+    }
+    else if ((RSSI_THRESHOLD_OPEN > event->disc.rssi) && door_closed)
+    {
+            rc = handle_proximity_lost();
+            if (PASS != rc)
+            {
+                ESP_LOGE(TAG, "Error: handling handle_proximity_lost()");
+            }
+            door_closed = false;
+    }
+
+EXIT:
     return PASS;
 }
 
@@ -154,7 +149,8 @@ ble_app_scan(void)
     if (PASS != rc)
     {
         ESP_LOGE(TAG, "Error initiating GAP discovery: %d", rc);
-    } else
+    }
+    else
     {
         ESP_LOGI(TAG, "Scanning started...");
     }
