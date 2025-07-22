@@ -13,19 +13,14 @@
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
 #include "host/ble_hs_adv.h"
-#include "driver/ledc.h"
 #include "esp_err.h"
-#include "host/util/util.h"
-#include "console/console.h"
-#include "services/gap/ble_svc_gap.h"
 #include "servo_motor.h"
 #include "soc/gpio_num.h"
+#include <stdlib.h>
 
 /*****************************
  *  DEFINES
  *****************************/
-
-/* #define RSSI_THRESHOLD (-30) */
 
 #define RSSI_THRESHOLD_CLOSE (-30)  /* below this, close */
 #define RSSI_THRESHOLD_OPEN  (-45)  /* above this, open */
@@ -49,7 +44,8 @@ static bool door_closed = false;
  *  LOCAL FUNCTIONS
  *****************************/
 
-static int handle_proximity_detected(void)
+static int
+handle_proximity_detected(void)
 {
     /* close motors */
     ESP_LOGI(TAG, ">>> Proximity threshold reached, closing door...");
@@ -59,7 +55,8 @@ static int handle_proximity_detected(void)
     return PASS;
 }
 
-static int handle_proximity_lost(void)
+static int
+handle_proximity_lost(void)
 {
     /* if door is open then close? */
     ESP_LOGI(TAG, ">>> Proximity threshold lost, opening door...");
@@ -67,7 +64,9 @@ static int handle_proximity_lost(void)
     return PASS;
 }
 
-static void ble_addr_to_str_fixed(const ble_addr_t *addr, char *str, size_t size)
+static void
+__attribute__((always_inline))
+ble_addr_to_str_fixed(const ble_addr_t *addr, char *str, size_t size)
 {
     snprintf(str, size,
              "%02X:%02X:%02X:%02X:%02X:%02X",
@@ -76,7 +75,9 @@ static void ble_addr_to_str_fixed(const ble_addr_t *addr, char *str, size_t size
 }
 
 /* Called when a device is discovered during scanning */
-static int ble_gap_event_cb(struct ble_gap_event *event, void *arg)
+static int
+__attribute__((flatten, hot))
+ble_gap_event_cb(struct ble_gap_event *event, void *arg)
 {
     int rc;
     (void) MY_TAG_ADDR;
@@ -137,7 +138,8 @@ static int ble_gap_event_cb(struct ble_gap_event *event, void *arg)
 }
 
 /* Start scanning */
-static void ble_app_scan(void)
+static void
+ble_app_scan(void)
 {
     int rc;
     struct ble_gap_disc_params params = {0};
@@ -163,7 +165,8 @@ static void ble_app_scan(void)
  *****************************/
 
 /* BLE host task */
-void host_task(void *param)
+void
+host_task(void *param)
 {
     ESP_LOGI(TAG, "NimBLE Host task started");
     nimble_port_run();  /* This function will return only when nimble_port_stop() is called */
@@ -200,3 +203,4 @@ app_main(void)
 
     nimble_port_freertos_init(host_task);
 }
+
