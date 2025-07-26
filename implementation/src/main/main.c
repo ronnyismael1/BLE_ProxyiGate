@@ -15,16 +15,18 @@
 #include "host/ble_hs_adv.h"
 #include "esp_err.h"
 #include "servo_motor.h"
-#include "soc/gpio_num.h"
+#include "esp_heap_caps.h"
+#include "sdkconfig.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <stdlib.h>
 
 /*****************************
  *  DEFINES
  *****************************/
 
-#define RSSI_THRESHOLD_CLOSE (-30)  /* below this, close */
-#define RSSI_THRESHOLD_OPEN  (-45)  /* above this, open */
-
+#define RSSI_THRESHOLD_CLOSE (CONFIG_RSSI_THRESHOLD_CLOSE) /* below this, close */
+#define RSSI_THRESHOLD_OPEN  (CONFIG_RSSI_THRESHOLD_OPEN)  /* above this, open */
 #define PASS (0)
 #define FAIL (-1)
 
@@ -33,7 +35,7 @@
  *****************************/
 
 static const char *TAG = "BLE_ProxiGate";
-static const uint8_t MY_TAG_ADDR[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};  /* MAC Address of TARGET BLE beacon */
+static const uint8_t MY_TAG_ADDR[6] = {0x57, 0x3C, 0x02, 0x90, 0xC8, 0xF0};
 static bool door_closed = false;
 
 /*****************************
@@ -49,7 +51,7 @@ handle_proximity_detected(void)
 {
     /* close motors */
     ESP_LOGI(TAG, ">>> Proximity threshold reached, closing door...");
-    set_servo_angle(90);
+    set_servo_angle(CONFIG_SERVO_CLOSED_ANGLE);
     /* send ping over wifi? */
     /* blare alarm? */
     return PASS;
@@ -60,11 +62,11 @@ handle_proximity_lost(void)
 {
     /* if door is open then close? */
     ESP_LOGI(TAG, ">>> Proximity threshold lost, opening door...");
-    set_servo_angle(0);
+    set_servo_angle(CONFIG_SERVO_OPEN_ANGLE);
     return PASS;
 }
 
-static void
+inline static void
 __attribute__((always_inline))
 ble_addr_to_str_fixed(const ble_addr_t *addr, char *str, size_t size)
 {
@@ -90,24 +92,36 @@ ble_gap_event_cb(struct ble_gap_event *event, void *arg)
     }
 
     ble_addr_to_str_fixed(&event->disc.addr, addr_str, sizeof(addr_str));
+    // ESP_LOGI(TAG, "[SCAN] MAC: %s, RSSI: %d", addr_str, event->disc.rssi);
+
+#if CONFIG_ENABLE_IPHONE_BEACON
+    if (memcmp(event->disc.addr.val, MY_TAG_ADDR, 6) != 0)
+    {
+        goto EXIT;
+    }
+#endif /* CONFIG_ENABLE_IPHONE_BEACON */
 
     if (0 != ble_hs_adv_parse_fields(&fields, event->disc.data, event->disc.length_data))
     {
         goto EXIT;
     }
 
+#if !CONFIG_ENABLE_IPHONE_BEACON
     if (NULL == fields.name)
     {
        goto EXIT;
     }
 
     /* ESP_LOGI(TAG, "Device name: %.*s", fields.name_len, fields.name); */
+
     if (0 != strncmp((const char*)fields.name, "Ronny", fields.name_len))
     {
        goto EXIT;
     }
-
     ESP_LOGI(TAG, ">>> Name: %.*s, RSSI: %d", fields.name_len, fields.name, event->disc.rssi);
+#else /* CONFIG_ENABLE_IPHONE_BEACON */
+    ESP_LOGI(TAG, ">>> MAC: %s, RSSI: %d", addr_str, event->disc.rssi);
+#endif /* CONFIG_ENABLE_IPHONE_BEACON */
 
     if ((RSSI_THRESHOLD_CLOSE < event->disc.rssi) && !door_closed)
     {
@@ -173,6 +187,33 @@ host_task(void *param)
 void
 app_main(void)
 {
+    UBaseType_t stack_remaining;
+    size_t stack_total;
+    size_t free_heap;
+    size_t total_heap;
+    size_t min_free_heap;
+
+    stack_remaining = uxTaskGetStackHighWaterMark(NULL);
+    stack_total = CONFIG_ESP_MAIN_TASK_STACK_SIZE / sizeof(StackType_t);  // Convert bytes to words
+
+    free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    total_heap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+    min_free_heap = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
+
+    ESP_LOGI("MEM", "Stack usage: %u/%u words (%.1f%% free)",
+             stack_total - stack_remaining, stack_total,
+             100.0f * stack_remaining / stack_total);
+
+    ESP_LOGI("MEM", "Heap usage: %u/%u bytes (%.1f%% free)",
+             total_heap - free_heap, total_heap,
+             100.0f * free_heap / total_heap);
+
+    ESP_LOGI("MEM", "Minimum free heap ever: %u bytes", min_free_heap);
+
+#if !CONFIG_ENABLE_LOGGING
+    esp_log_level_set("*", ESP_LOG_NONE);
+#endif /* CONFIG_ENABLE_LOGGING */
+
     ESP_LOGI(TAG, "ESP32 startup procedure beginning...");
 
     /* Initialize NVS — it is used to store PHY calibration data */
@@ -192,7 +233,7 @@ app_main(void)
         return;
     }
 
-    setup_pwm(GPIO_NUM_33);
+    setup_pwm(CONFIG_SERVO_GPIO_PIN);
 
     ble_hs_cfg.reset_cb = NULL;
     ble_hs_cfg.sync_cb = ble_app_scan;  /* called when BLE stack is ready */

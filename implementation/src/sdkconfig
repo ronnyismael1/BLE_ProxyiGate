@@ -407,7 +407,19 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
-# BLE ProxiGate
+# BLE ProxiGate Configuration
+#
+# CONFIG_ENABLE_IPHONE_BEACON is not set
+# CONFIG_ENABLE_LOGGING is not set
+CONFIG_SERVO_GPIO_PIN=33
+CONFIG_SERVO_CLOSED_ANGLE=90
+CONFIG_SERVO_OPEN_ANGLE=0
+CONFIG_RSSI_THRESHOLD_CLOSE=-40
+CONFIG_RSSI_THRESHOLD_OPEN=-60
+# end of BLE ProxiGate Configuration
+
+#
+# Servo Motor Settings
 #
 
 #

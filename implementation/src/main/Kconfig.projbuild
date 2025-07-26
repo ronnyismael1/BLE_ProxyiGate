@@ -1,3 +1,42 @@
-menu "BLE ProxiGate"
+menu "BLE ProxiGate Configuration"
+
+config ENABLE_IPHONE_BEACON
+    bool "Enable iPhone Beacon Scanning"
+    default n
+
+config ENABLE_LOGGING
+    bool "Enable ESP Logging"
+    default y
+
+config SERVO_GPIO_PIN
+    int "GPIO Pin for Servo Motor"
+    default 33
+    help
+        Choose which PWM GPIO to use for the servo motor signal pin.
+
+config SERVO_CLOSED_ANGLE
+    int "Servo Closed Angle"
+    default 90
+    help
+        PWM angle to use when closing the door.
+
+config SERVO_OPEN_ANGLE
+    int "Servo Open Angle"
+    default 0
+    help
+        PWM angle to use when opening the door.
+
+config RSSI_THRESHOLD_CLOSE
+    int "RSSI Threshold to Close"
+    default -40
+    help
+        If RSSI is stronger than this, the door closes.
+
+config RSSI_THRESHOLD_OPEN
+    int "RSSI Threshold to Open"
+    default -60
+    help
+        If RSSI is weaker than this, the door opens.
 
 endmenu
+

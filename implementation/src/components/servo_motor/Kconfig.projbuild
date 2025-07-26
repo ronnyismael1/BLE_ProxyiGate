@@ -1,0 +1,12 @@
+menu "Servo Motor Settings"
+
+# config SERVO_PWM_FREQ
+#     int "PWM Frequency"
+#     default 50
+#
+# config SERVO_GPIO_PIN
+#     int "GPIO Pin for Servo"
+#     default 33
+
+endmenu
+
