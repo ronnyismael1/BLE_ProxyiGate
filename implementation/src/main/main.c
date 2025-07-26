@@ -17,7 +17,6 @@
 #include "servo_motor.h"
 #include "esp_heap_caps.h"
 #include "sdkconfig.h"
-#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <stdlib.h>
 
@@ -94,7 +93,7 @@ ble_gap_event_cb(struct ble_gap_event *event, void *arg)
     ble_addr_to_str_fixed(&event->disc.addr, addr_str, sizeof(addr_str));
     // ESP_LOGI(TAG, "[SCAN] MAC: %s, RSSI: %d", addr_str, event->disc.rssi);
 
-#if CONFIG_ENABLE_IPHONE_BEACON
+#if !CONFIG_ENABLE_IPHONE_BEACON
     if (memcmp(event->disc.addr.val, MY_TAG_ADDR, 6) != 0)
     {
         goto EXIT;
@@ -106,7 +105,7 @@ ble_gap_event_cb(struct ble_gap_event *event, void *arg)
         goto EXIT;
     }
 
-#if !CONFIG_ENABLE_IPHONE_BEACON
+#if CONFIG_ENABLE_IPHONE_BEACON
     if (NULL == fields.name)
     {
        goto EXIT;
